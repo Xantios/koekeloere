@@ -2,7 +2,10 @@ package main
 
 import (
 	"flag"
+	"strings"
+
 	"github.com/sirupsen/logrus"
+	"github.com/xantios/koekeloere/moffel"
 	"github.com/xantios/koekeloere/piertje"
 )
 
@@ -17,8 +20,8 @@ var log = logrus.New()
 // main Parse CLI options and run watcher
 func main() {
 
-	verbose = flag.Bool("v",false,"verbose mode")
-	watchDirs := flag.String("w",".","Dirs to watch, comma seperated")
+	verbose = flag.Bool("v", false, "verbose mode")
+	watchDirs := flag.String("w", ".", "Dirs to watch, comma seperated")
 	hooks = flag.Args()
 
 	flag.Parse()
