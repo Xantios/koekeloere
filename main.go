@@ -31,8 +31,25 @@ func main() {
 		log.SetLevel(logrus.DebugLevel)
 	}
 
+	// Setup Moffel to send out messages
+	moffel.SetVerbose(verbose)
+	moffel.SetLogger(log)
+	moffel.Init(hooks)
+
+	// Make a channel to pull async messages from
+	channel := make(chan string)
+
+	// Setup piertje to watch files
 	piertje.SetLogger(log)
 	piertje.SetVerbose(verbose)
 	piertje.SetPaths(*watchDirs)
-}
+	piertje.SetChannel(channel)
 
+	go piertje.Run()
+
+	for {
+		msg := <-channel
+		split := strings.SplitN(msg, ":", 2)
+		moffel.Emit(split[0], split[1])
+	}
+}
