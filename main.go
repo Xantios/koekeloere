@@ -22,9 +22,10 @@ func main() {
 
 	verbose = flag.Bool("v", false, "verbose mode")
 	watchDirs := flag.String("w", ".", "Dirs to watch, comma seperated")
-	hooks = flag.Args()
 
 	flag.Parse()
+
+	hooks = flag.Args()
 
 	if *verbose {
 		log.Warn("Running in verbose mode")
