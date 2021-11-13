@@ -58,7 +58,7 @@ func Init(uris []string) {
 		}
 
 		if drivers[client.Name] == nil {
-			log.Warnf("There is no handler for %s, feel free to PR one", client.Name)
+			log.Warnf("There is no handler for \"%s\", feel free to PR one", client.Name)
 			continue
 		}
 
