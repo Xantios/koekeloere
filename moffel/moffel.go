@@ -5,7 +5,9 @@ package moffel
 
 import (
 	"errors"
-	"strings"
+	"net/url"
+	"reflect"
+	"strconv"
 
 	"github.com/sirupsen/logrus"
 )
@@ -26,9 +28,9 @@ var log logrus.Logger
 var verbose bool = false
 
 // @TODO: Add std support for Slack/Discord maybe?
-var protocols = []string{
-	"http",
-	"https",
+var drivers = map[string]interface{}{
+	"http":  http,
+	"https": https,
 }
 
 func SetVerbose(verb *bool) {
@@ -42,11 +44,22 @@ func SetLogger(instance *logrus.Logger) {
 }
 
 func Init(uris []string) {
+
+	if len(uris) <= 0 {
+		log.Warn("No URI's defined, logging to CLI only")
+	}
+
 	for _, uri := range uris {
 		client, err := parseUri(uri)
 
 		if err != nil {
 			log.Errorf("Cant parse %s")
+			continue
+		}
+
+		if drivers[client.Name] == nil {
+			log.Warnf("There is no handler for %s, feel free to PR one", client.Name)
+			continue
 		}
 
 		clients = append(clients, client)
@@ -60,41 +73,55 @@ func GetClients() []MoffelClient {
 func parseUri(uri string) (MoffelClient, error) {
 
 	c := MoffelClient{}
-	protocol := strings.SplitN(uri, ":", 1)[0]
-	server := strings.SplitN(uri, ":", 1)[1]
+	parsedUrl, err := url.Parse(uri)
 
-	if !stringInStringSlice(protocol, protocols) {
-		log.Errorf("Cant register protocol %s.\n", protocols)
-		return c, errors.New("cant register protocol")
+	if err != nil {
+		return c, err
 	}
 
-	if c.Protocol == "http" || c.Name == "https" {
-		c.Name = c.Protocol
+	port, err := strconv.Atoi(parsedUrl.Port())
+	if err != nil || port == 0 {
+		if parsedUrl.Scheme == "http" {
+			port = 80
+		}
+
+		if parsedUrl.Scheme == "https" {
+			port = 443
+		}
 	}
 
-	if c.Protocol == "http" {
-		c.Port = 80
-	}
-
-	if c.Protocol == "https" {
-		c.Port = 443
-	}
-
-	c.Server = server
+	c.Name = parsedUrl.Scheme
+	c.Protocol = parsedUrl.Scheme
+	c.Server = parsedUrl.Host
+	c.Port = port
+	c.Path = parsedUrl.Path
+	c.Query = "" // @todo: pull from parsedUrl.Query()
 
 	return c, nil
 }
 
-func stringInStringSlice(q string, slices []string) bool {
-	for _, slice := range slices {
-		if slice == q {
-			return true
-		}
-	}
-
-	return false
-}
-
 func Emit(event string, filename string) {
 	log.Infof("Stuff: %s %s\n", event, filename)
+
+	for _, client := range clients {
+		__call(client.Name, client.Server, 1)
+	}
+}
+
+func __call(funcName string, params ...interface{}) (result interface{}, err error) {
+	f := reflect.ValueOf(drivers[funcName])
+
+	if len(params) != f.Type().NumIn() {
+		err = errors.New("number of params is out of index")
+		return
+	}
+
+	in := make([]reflect.Value, len(params))
+	for k, param := range params {
+		in[k] = reflect.ValueOf(param)
+	}
+
+	var res []reflect.Value = f.Call(in)
+	result = res[0].Interface()
+	return
 }
