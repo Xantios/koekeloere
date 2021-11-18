@@ -19,18 +19,18 @@ type MoffelClient struct {
 	Port     int
 	Path     string
 	Query    string
+	Parser   *url.URL
 }
 
 var clients []MoffelClient
 var log logrus.Logger
 
-// @TODO: Use this when sending webhooks so the CLI user knows whats happening
 var verbose bool = false
 
-// @TODO: Add std support for Slack/Discord maybe?
+// Add drivers here
 var drivers = map[string]interface{}{
 	"http":  http,
-	"https": https,
+	"https": http,
 }
 
 func SetVerbose(verb *bool) {
@@ -96,6 +96,7 @@ func parseUri(uri string) (MoffelClient, error) {
 	c.Port = port
 	c.Path = parsedUrl.Path
 	c.Query = "" // @todo: pull from parsedUrl.Query()
+	c.Parser = parsedUrl
 
 	return c, nil
 }
@@ -104,10 +105,30 @@ func Emit(event string, filename string) {
 	log.Infof("Stuff: %s %s\n", event, filename)
 
 	for _, client := range clients {
-		__call(client.Name, client.Server, 1)
+
+		if verbose {
+			log.Printf("Emitting %s event <%s,%s>", client.Name, event, filename)
+		}
+
+		// Function definition should match
+		// __call("MyFunction",<fileEvent>,<fileName>,[*url.URL]) error
+		errInterface, callErr := __call(client.Name, event, filename, client.Parser)
+		err := errInterface.(error)
+		if callErr != nil {
+			log.Errorf("Error while calling %s: %s", client.Name, callErr.Error())
+		}
+
+		if err != nil {
+			log.Errorf("Driver error: %s", err.Error())
+		} else {
+			if verbose {
+				log.Info("Emitted %s event OK")
+			}
+		}
 	}
 }
 
+// Call a function by a variable eg: __call("myFunction","someParam1","someParam2")
 func __call(funcName string, params ...interface{}) (result interface{}, err error) {
 	f := reflect.ValueOf(drivers[funcName])
 
